@@ -1,7 +1,7 @@
 package examples
 
 import (
-	"log"
+	"fmt"
 
 	goCld "github.com/fanadewi/go-cloudinary"
 )
@@ -20,5 +20,5 @@ func UploadByte() {
 		panic(err)
 	}
 
-	log.Println(response)
+	fmt.Println(response)
 }

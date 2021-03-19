@@ -1,7 +1,7 @@
 package examples
 
 import (
-	"log"
+	"fmt"
 
 	goCld "github.com/fanadewi/go-cloudinary"
 )
@@ -18,5 +18,5 @@ func UploadUrlFile() {
 		panic(err)
 	}
 
-	log.Println(response)
+	fmt.Println(response)
 }

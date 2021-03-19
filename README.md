@@ -19,19 +19,24 @@ $ go get -u github.com/fanadewi/go-cloudinary
 
 * Import it in your code:
 ```go
-import "github.com/fanadewi/go-cloudinary"
+import goCld "github.com/fanadewi/go-cloudinary"
 ```
 
 ### Quick start
 ```go
-uploader := cloud.CloudinaryRequest{
-		File:        file.File,
-		CloudName:   conf.CloudName,
-		CloudKey:    conf.CloudKey,
-		CloudSecret: conf.CloudSecret,
+uploader := goCld.CloudinaryRequest{
+		File:   	file,
+		FileName:   example.jpg,
+		Name:   	"cloudinaryName",
+		Key:    	"cloudinaryKey",
+		Secret: 	"cloudinarySecret",
 	}
 
-c.JSON(http.StatusOK, uploader.Upload())
+ response, err := uploader.Upload())
+ if err!=nil{
+	 panic(err)
+ }
+ fmt.Println(response)
 ```
 
 ## Authors

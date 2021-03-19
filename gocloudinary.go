@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -53,24 +54,24 @@ func (cloud *CloudinaryRequest) Upload() (*CloudinaryResponse, error) {
 	cloud.Timestamp = time.Now().Unix()
 	cloud.Signature = sha256.Sum256([]byte(fmt.Sprintf("timestamp=%d%s", cloud.Timestamp, cloud.Secret)))
 
-	byteFile, isFileByte := isByte(cloud.File)
-	stringFile, isFileString := isString(cloud.File)
+	validFile := isByte(cloud.File)
+	validString := isString(cloud.File)
 
-	if isFileByte {
-		return multiUpload(cloud, byteFile, baseUrl)
-	} else if isFileString {
-		return urlEncodedUpload(cloud, stringFile, baseUrl)
+	if validString {
+		return urlEncodedUpload(cloud, cloud.File.(string), baseUrl)
+	} else if validFile {
+		return multiUpload(cloud, cloud.File.([]byte), baseUrl)
 	} else {
 		return nil, fmt.Errorf("File unknown")
 	}
 }
 
-func isByte(file interface{}) ([]byte, bool) {
-	theFile, ok := file.([]byte)
+func isByte(file interface{}) bool {
+	_, ok := file.([]byte)
 	if !ok {
-		return nil, false
+		return false
 	}
-	return theFile, true
+	return true
 }
 
 func isSupportedFile(fileName string) bool {
@@ -81,12 +82,12 @@ func isSupportedFile(fileName string) bool {
 	return true
 }
 
-func isString(file interface{}) (string, bool) {
-	theFile, ok := file.(string)
+func isString(file interface{}) bool {
+	_, ok := file.(string)
 	if !ok {
-		return "", false
+		return false
 	}
-	return theFile, true
+	return true
 }
 
 func urlEncodedUpload(cloud *CloudinaryRequest, stringFile string, baseUrl string) (*CloudinaryResponse, error) {
@@ -120,34 +121,34 @@ func multiUpload(cloud *CloudinaryRequest, byteFile []byte, baseUrl string) (*Cl
 		"timestamp": fmt.Sprintf("%d", cloud.Timestamp),
 		"signature": fmt.Sprintf("%x", cloud.Signature[:]),
 	}
-	body := new(bytes.Buffer)
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("file", cloud.FileName)
-	if err != nil {
-		return nil, err
-	}
-	part.Write(byteFile)
-	for key, val := range extraParams {
-		_ = writer.WriteField(key, val)
-	}
-	err = writer.Close()
-	if err != nil {
-		return nil, err
+
+	bodyBuf := &bytes.Buffer{}
+	bodyWriter := multipart.NewWriter(bodyBuf)
+	for k, v := range extraParams {
+		bodyWriter.WriteField(k, v)
 	}
 
-	request, err := http.NewRequest("POST", baseUrl, body)
+	fileWriter, err := bodyWriter.CreateFormFile("file", cloud.FileName)
+	fileWriter.Write(byteFile)
+	contentType := bodyWriter.FormDataContentType()
+	bodyWriter.Close()
+	resp, err := http.Post(baseUrl, contentType, bodyBuf)
 	if err != nil {
 		return nil, err
 	}
-	client := &http.Client{}
-	response, err := client.Do(request)
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("[%d %s]%s", resp.StatusCode, resp.Status, string(b))
+	}
+	respData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	cloudinaryResponse := &CloudinaryResponse{}
-	err = json.NewDecoder(response.Body).Decode(cloudinaryResponse)
+	err = json.Unmarshal(respData, cloudinaryResponse)
 	if err != nil {
 		return nil, err
 	}
